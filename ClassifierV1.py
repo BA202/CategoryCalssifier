@@ -3,6 +3,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 
 # for text preprocessing
+from io import StringIO
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
@@ -11,8 +12,17 @@ from nltk.stem import WordNetLemmatizer
 
 class CategoryClassifier:
     def __init__(self, training_data):
-        cleaned_training_data = __preprocess_sentences(training_data)
-        category_dict = {
+        """
+        Here a Tf-idf vectorizer is used to vectorize the cleaned data
+        A Multinomial Naive Bayes Classifier is here used to fit the vectorized data
+
+        Parameters
+        ----------
+        training_data : list
+            contains as first string the full review and for the second string the associated category
+            [[string, string]]
+        """
+        self.__category_dict = {
             "Location": 1,
             "Room": 2,
             "Food": 3,
@@ -23,68 +33,78 @@ class CategoryClassifier:
             "Unknown": 8,
         }
 
-        category_list = []
-        for sent in cleaned_training_data:
-            sent_list = [sent[0], category_dict[sent[1]]]
-            category_list.append(sent_list)
+        self.__inv_category_dict = {v: k for k, v in self.__category_dict.items()}
 
-        df_train = pd.DataFrame(category_list, columns=["sentence", "category"])
+        cleaned_training_data = []
+        for sent in training_data:
+            sent_list = [
+                self.__preprocess_sentences(sent[0]),
+                self.__category_dict[sent[1]],
+            ]
+            cleaned_training_data.append(sent_list)
+
+        df_train = pd.DataFrame(cleaned_training_data, columns=["sentence", "category"])
         X_train = df_train["sentence"]
         y_train = df_train["category"]
 
         self.__tfidf_vec = TfidfVectorizer(use_idf=True)
-        X_train_vec_tfidf = self.__tfidf_vec.transform(X_train)
+        X_train_vec_tfidf = self.__tfidf_vec.fit_transform(
+            X_train
+        )  # tfidf runs on non-tokenized sentences unlike word2vec
 
         self.__nb_tfidf = MultinomialNB()
         self.__nb_tfidf.fit(X_train_vec_tfidf, y_train)
 
-    def __preprocess_sentences(self, data):
-        sent_list = []
-        for sentence in data:
-            sent_list.append(sentence[0])
+    def __preprocess_sentences(self, string):
+        """
 
-        for i in range(len(sent_list)):
-            sent_list[i] = sent_list[i].lower()
-            sent_list[i] = sent_list[i].replace(".", " ").replace(",", " ")
+        Parameters
+        ----------
+        string
 
-        list_of_sentence = []
-        for sentence in sent_list:
-            no_stopwords = []
-            for word in sentence.split(" "):
-                if word not in stopwords.words("english"):
-                    no_stopwords.append(word)
-            list_of_sentence.append(" ".join(no_stopwords))
+        Returns
+        -------
+        string
+
+        Examples
+        --------
+
+        """
+        text = string.lower().replace(".", " ").replace(",", " ")
+
+        a = [word for word in text.split() if word not in stopwords.words("english")]
+        no_stopwords_txt = " ".join(a)
 
         snow = SnowballStemmer("english")
-        list_of_stemmed_sentences = []
-        for sentence in list_of_sentence:
-            stemmed_sent = []
-            for word in word_tokenize(sentence):
-                s = snow.stem(word)
-                stemmed_sent.append(s)
-            list_of_stemmed_sentences.append(" ".join(stemmed_sent))
+        b = [snow.stem(word) for word in word_tokenize(no_stopwords_txt)]
+        stemmed_txt = " ".join(b)
 
         wordnet_lemmatizer = WordNetLemmatizer()
-        list_of_lemmatized_sentences = []
-        for sentence in list_of_lemmatized_sentences:
-            lemmatized_sent = []
-            for word in sentence.split(" "):
-                lemma = wordnet_lemmatizer.lemmatize(word)
-                lemmatized_sent.append(lemma)
-            list_of_lemmatized_sentences.append(" ".join(lemmatized_sent))
+        c = [wordnet_lemmatizer.lemmatize(word) for word in stemmed_txt.split(" ")]
+        lemmatized_txt = " ".join(c)
 
-        cleaned_data = []
-        for sentence in list_of_lemmatized_sentences:
-            for category in data:
-                final_list = [sentence, category[1]]
-                cleaned_data.append(final_list)
+        return lemmatized_txt
 
-        return cleaned_data
+    def classify(self, string):
+        """
+        Returns a list with the predicted category and the certainty of the prediction
 
-    def classify(self, test_data):
-        cleaned_test_data = self.__preprocess_sentences(test_data)
+        A Tf-idf vectorizer is used to vectorize the string
+        For the prediction the pre-trained Multinomial Naive Bayes Classifier is used
 
-        df_test = pd.DataFrame(cleaned_test_data, columns=["sentence"])
+        Parameters
+        ----------
+        string
+
+        Returns
+        -------
+        list
+            [(string, float)]
+        """
+        cleaned_string = self.__preprocess_sentences(string)
+        cleaned_string = StringIO(cleaned_string)
+
+        df_test = pd.DataFrame(cleaned_string, columns=["sentence"])
         X_test = df_test["sentence"]
 
         X_test_vec_tfidf = self.__tfidf_vec.transform(X_test)
@@ -94,7 +114,16 @@ class CategoryClassifier:
         df_test["predicted_category"] = y_predict_test
         df_test["confidence"] = y_proba_test
 
-        return df_test.values.tolist()
+        predicted_category = df_test["predicted_category"].tolist()
+        confidence = df_test["confidence"].tolist()
+        full_list = list(zip(predicted_category, confidence))
+
+        result_list = []
+        for sent in full_list:
+            sentence_list = [self.__inv_category_dict[sent[0]], sent[1]]
+            result_list.append(sentence_list)
+
+        return result_list
 
 
 if __name__ == "__main__":
@@ -103,6 +132,15 @@ if __name__ == "__main__":
 
     my_data_handler = DataHandler()
     category_list = my_data_handler.getCategorieData("Location")
-    for sent in category_list[1:10]:
-        print(f"{sent[0]:100}|{sent[1]}")
+    #   for sent in category_list[1:10]:
+    #     print(f"{sent[0]:100}|{sent[1]}")
 
+    training_data, test_data = train_test_split(
+        category_list, test_size=0.2, shuffle=True
+    )
+
+    txt = "The staff was very friendly"
+
+    classifier = CategoryClassifier(training_data)
+    res = classifier.classify(txt)
+    print(res)
