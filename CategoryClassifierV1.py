@@ -1,9 +1,11 @@
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
+import pdfkit
 
 # for text preprocessing
 from io import StringIO
+import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
@@ -22,6 +24,7 @@ class CategoryClassifier:
                 the first string contains the full review and for the second string the associated category
             [[string, string]]
         """
+        nltk.download("wordnet")
         self.__category_dict = {
             "Location": 1,
             "Room": 2,
@@ -57,7 +60,7 @@ class CategoryClassifier:
 
     def __preprocess_sentences(self, string):
         """
-        Returns a cleaned string. 
+        Returns a cleaned string.
         Stopword removal, stemmig and lemmatizing
 
         Parameters
@@ -108,6 +111,7 @@ class CategoryClassifier:
 
         df_test = pd.DataFrame(cleaned_string, columns=["sentence"])
         X_test = df_test["sentence"]
+        print(X_test)
 
         X_test_vec_tfidf = self.__tfidf_vec.transform(X_test)
         y_predict_test = self.__nb_tfidf.predict(X_test_vec_tfidf)
@@ -130,6 +134,7 @@ class CategoryClassifier:
 
 if __name__ == "__main__":
     from DataHandler.DataHandler import DataHandler
+    from ModelReport.ModelReport import ModelReport
     from sklearn.model_selection import train_test_split
 
     my_data_handler = DataHandler()
@@ -141,8 +146,42 @@ if __name__ == "__main__":
         category_list, test_size=0.2, shuffle=True
     )
 
-    txt = "The staff was very friendly"
+    # txt = "The staff was very friendly"
 
     classifier = CategoryClassifier(training_data)
-    res = classifier.classify(txt)
-    print(res)
+    # res = classifier.classify(txt)
+    # print(res)
+
+    modelName = "TestModel"
+    modelCreator = "Giovanni Triulzi"
+    mlPrinciple = "Naive Bayes"
+    refrences = {
+        "Wikipedia": "https://en.wikipedia.org/wiki/Naive_Bayes_classifier",
+        "Scikit-learn": "https://scikit-learn.org/stable/modules/naive_bayes.html",
+    }
+    algorithemDescription = """The learning algorithm used in this classification is the Multinomial Naive Bayse. This approach was chosen as it is easy to implement and is computational very efficient. The first step in the classification pipeline is removing all stop words for example 'i', 'me', etc. A list of English stop words is provided by the nltk module. Next the sentence is passed through"""
+    graphicPath = ""
+    graphicDescription = ""
+
+    list_of_test_results = []
+    for sent in test_data:
+        print(len(sent[0]))
+        list_of_test_results.append([classifier.classify(sent[0])[0][0], sent[1]])
+
+    print(list_of_test_results)
+    myModelReport = ModelReport(
+        modelName,
+        modelCreator,
+        mlPrinciple,
+        refrences,
+        algorithemDescription,
+        graphicPath,
+        graphicDescription,
+    )
+    myModelReport.addTrainingSet(training_data)
+    myModelReport.addTestResults(list_of_test_results)
+    config = pdfkit.configuration(
+        wkhtmltopdf="C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe"
+    )
+
+    myModelReport.createRaport()
