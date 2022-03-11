@@ -159,7 +159,16 @@ if __name__ == "__main__":
         "Wikipedia": "https://en.wikipedia.org/wiki/Naive_Bayes_classifier",
         "Scikit-learn": "https://scikit-learn.org/stable/modules/naive_bayes.html",
     }
-    algorithemDescription = """The learning algorithm used in this classification is the Multinomial Naive Bayse. This approach was chosen as it is easy to implement and is computational very efficient. The first step in the classification pipeline is removing all stop words for example 'i', 'me', etc. A list of English stop words is provided by the nltk module. Next the sentence is passed through"""
+    algorithemDescription = """The learning algorithm used in this classification is the Multinomial Naive Bayse.
+    This approach was chosen as it is easy to implement and is computational very efficient.
+    The first step in the classification pipeline is removing all stop words for example 'i', 'me', etc.
+    A list of English stop words is provided by the nltk module. Next the sentence is passed through a stemmer and a lemmatizer.
+    Stemming just removes or stems the last few characters of a word, often leading to incorrect meanings and spelling.
+    Lemmatization considers the context and converts the word to its meaningful base form, which is called Lemma.
+    This is done with the SnowBallStemmer and WordNetLemmatizer class from the nltk module.
+    The final preprocessing step is to vectorize the sentence. For this the Tf-idf vectorizer from sklearn is used.
+    If a Tf-idf vectorizer the sentences don't have to be tokenized.
+    The sentence is now represented in a numerical feature vector which now can be passed to the Naive Bayes classifier."""
     graphicPath = ""
     graphicDescription = ""
 
@@ -180,8 +189,4 @@ if __name__ == "__main__":
     )
     myModelReport.addTrainingSet(training_data)
     myModelReport.addTestResults(list_of_test_results)
-    config = pdfkit.configuration(
-        wkhtmltopdf="C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe"
-    )
-
     myModelReport.createRaport()
